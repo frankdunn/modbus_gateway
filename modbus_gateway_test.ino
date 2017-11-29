@@ -1,11 +1,11 @@
+#include <SoftwareSerial.h>
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 
-// Hardcode WiFi parameters as this isn't going to be moving around.
 const char* ssid = "frank1";
 const char* password = "annarieannarie";
 
-// Start a TCP Server on port 5045
+// Start a TCP Server on port 502
 
 WiFiServer server(502);
 WiFiClient client ;
@@ -23,8 +23,7 @@ uint16_t calcCRC(uint8_t u8_buff_size)
   for (uint8_t i = 0; i < u8_buff_size; i++)
   {
     tmp = tmp ^ rtu_buf[i];
-
-    for (uint8_t j = 1; j <= 8; j++)
+      for (uint8_t j = 1; j <= 8; j++)
     {
       flag = tmp & 0x0001;
       tmp >>= 1;
@@ -40,8 +39,11 @@ uint16_t calcCRC(uint8_t u8_buff_size)
 
   return tmp;
 }
+SoftwareSerial swSer(D2, D3, false, 256); //tx,rx
+
 
 void setup() {
+  swSer.begin(9600);
   Serial.begin(115200);
   WiFi.begin(ssid,password);
   Serial.println("");
@@ -98,6 +100,7 @@ void loop() {
       Serial.print(rtu_buf[i],HEX);
       }
       Serial.println();
+      swSer.write(rtu_buf,rtu_len + 2);
   }
  }
 }
