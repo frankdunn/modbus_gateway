@@ -11,7 +11,7 @@ WiFiServer server(502);
 WiFiClient client ;
 
 size_t len = 50;
-uint8_t sbuf[50];
+uint8_t sbuf[256];
 uint8_t rtu_buf[50];
 uint8_t rtu_len;
 
@@ -101,6 +101,7 @@ void loop() {
       }
       Serial.println();
       swSer.write(rtu_buf,rtu_len + 2);
+      //next step , receive fron swSer
   }
  }
 }
