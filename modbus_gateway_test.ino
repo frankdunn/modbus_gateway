@@ -48,7 +48,7 @@ void loop() {
       server.write(sbuf,len);
       // Echo input on Serial monitor
       //Serial.write(sbuf,len);
-      for (int i=0 ;i<readnum;i++){
+      for (int i=0 ;i<readnum;i++){   //print received char in hex
       Serial.print(sbuf[i],HEX);
       }
       Serial.print("\n\r");
