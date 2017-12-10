@@ -10,7 +10,7 @@ const char* password = "annarieannarie";
 WiFiServer server(502);
 WiFiClient client ;
 
-const long interval = 300;           // interval at which to blink (milliseconds)
+const long interval = 300;           // interval(milliseconds)
 size_t len = 50;
 uint8_t sbuf[100];
 uint8_t rtu_buf[100];
