@@ -2,8 +2,8 @@
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 
-const char* ssid = "FBOffice";
-const char* password = "kooskombuis12";
+const char* ssid = "....";
+const char* password = "....";
 
 // Start a TCP Server on port 502
 WiFiServer server(502);
