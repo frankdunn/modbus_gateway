@@ -10,10 +10,11 @@ Ticker watchdog;
 unsigned long currentMillis = 0;
 int i = 0;
 int readnum = 0;
-int state = 0;
+int state = 5;
 int value = 0;
 int watchCounter = 0;
 int transaction = 0;
+
 
 const char* ssid = "frank1";
 const char* password = "annarieannarie";
@@ -28,6 +29,7 @@ IPAddress subnet_mask(255, 255, 255,   0);
 WiFiServer server(502);
 WiFiClient client ;
 #ifdef debug
+int oldState = 0;
 WiFiServer server2(5020);
 WiFiClient client2 ;
 #endif
@@ -90,10 +92,7 @@ void loop() {
         client2 = server2.available();
       }
 #endif
-       //bailout:
-       //state = 0;
-       //memset(rtu_buf, 0, 50);
-       //memset(sbuf, 0, 50);
+       
        if (!client.connected()) {
         client = server.available();
         }
@@ -101,13 +100,26 @@ void loop() {
     
     switch (state)
     {
-       case  5:
+       case  0:
+              #ifdef debug       
+              client2.println("state 0");
+              #endif    
               memset(rtu_buf, 0, 50);
               memset(sbuf, 0, 50);
+              state = 5;
+              oldState = 0;
+       case  5:
+              #ifdef debug
+              if (state != oldState){       
+              client2.println("state 5");
+              oldState = state;
+              }
+              #endif   
               if (client.available() > 0) {
               state = 10;
               }
-              //break;
+                  
+              break;
        case 10:
               readnum = 0;
               readnum = client.read(sbuf,client.available());
@@ -117,7 +129,7 @@ void loop() {
               transaction ++;
               client2.print("transaction : ");
               client2.println(transaction);
-              client2.println("case 0");
+              client2.println("case 10");
               client2.print("readnum :");
               client2.println(readnum);
               client2.print("buffer : ");
@@ -169,34 +181,44 @@ void loop() {
                  digitalWrite(D0,LOW);
                  memset(rtu_buf, 0, 50);
                  state = 60;
+                 #ifdef debug       
+                 client2.println("state 50");
+                 #endif       
                  //break;
-       case 60:  // wait for char 
+       case 60:  // wait for char
+                 #ifdef debug       
+                 client2.println("state 60");
+                 #endif        
                  currentMillis = millis();
-                 while(!Serial.available()) {
+                 while((!Serial.available()) & state == 60){
                  yield();
                  if( millis() - currentMillis  > interval){
-                  //goto bailout;
-                  state = 5;
+                  state = 0;
+                  
                   } 
                  }   
-                 state  = 70;
+                 //state  = 70;
                  //break;
        case 70:
+                #ifdef debug       
+                client2.println("state 70");
+                #endif    
                 i = 6;
-                currentMillis = millis();
+                //currentMillis = millis();
                 while (Serial.available() > 0) {
                   rtu_buf[i] = Serial.read();
                   i ++;
                   yield();
                   if( millis() - currentMillis  > interval){
-                  //goto bailout;
-                  state = 5;
+                   state = 0;
                   } 
                  }
-         state = 5;
-         break;
-      }
-       
+         state = 80;
+         //break;
+       case 80:
+           #ifdef debug       
+           client2.println("state 80");
+           #endif    
            rtu_len = i- 2;
            rtu_buf[5] = rtu_len -6 ;
            rtu_buf[0] = sbuf[0];
@@ -208,6 +230,12 @@ void loop() {
            
            //Unfortunately there is a bad function overload in the library,
            //but you can just typecast the clientbuf to overcome this problem.....
-           //   eg ... client.write((const uint8_t*)clientBuf, sizeof(clientBuf));
+           //   eg ... client.write((const uint8_t*)clientBuf, sizeof(clientBuf));    
+
+       state = 0;
+       break;  
+      }
+       
+           
   }
  }
