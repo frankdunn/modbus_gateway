@@ -1,0 +1,208 @@
+//#include <SoftwareSerial.h>
+#include <ESP8266WiFi.h>
+//#include <WiFi.h>
+#include <WiFiClient.h>
+#include <Ticker.h>
+
+#define debug
+
+Ticker watchdog;
+unsigned long currentMillis = 0;
+int i = 0;
+int readnum = 0;
+int state = 0;
+int value = 0;
+int watchCounter = 0;
+int transaction = 0;
+
+const char* ssid = "frank1";
+const char* password = "annarieannarie";
+
+IPAddress arduino_ip ( 192,  168,   2,  235);
+IPAddress dns_ip     (  8,   8,   8,   8);
+IPAddress gateway_ip ( 192,  168,   2,   2);
+IPAddress subnet_mask(255, 255, 255,   0);
+
+// Start a TCP Server on port 502
+
+WiFiServer server(502);
+WiFiClient client ;
+#ifdef debug
+WiFiServer server2(5020);
+WiFiClient client2 ;
+#endif
+const long interval = 500;           // interval(milliseconds)
+size_t len = 50;
+uint8_t sbuf[100];
+uint8_t rtu_buf[100];
+uint8_t rtu_len;
+
+uint16_t calcCRC(uint8_t u8_buff_size)
+{
+  uint32_t tmp, tmp2, flag;
+  tmp = 0xFFFF;
+
+  for (uint8_t i = 0; i < u8_buff_size; i++)
+  {
+    tmp = tmp ^ rtu_buf[i];
+      for (uint8_t j = 1; j <= 8; j++)
+    {
+      flag = tmp & 0x0001;
+      tmp >>= 1;
+
+      if (flag)
+        tmp ^= 0xA001;
+    }
+  }
+  tmp2 = tmp >> 8;
+  tmp = (tmp << 8) | tmp2;
+  tmp &= 0xFFFF;
+
+  return tmp;
+}
+void watch(){
+   watchCounter ++;
+   if (watchCounter > 40){
+    ESP.reset();
+  }
+ }
+
+void setup() {
+  
+Serial.begin(115200);
+WiFi.config(arduino_ip, gateway_ip, subnet_mask);
+WiFi.begin(ssid,password);
+while(WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    }
+// Start the TCP server
+server.begin();
+#ifdef debug  
+server2.begin();
+#endif  
+pinMode(D0,OUTPUT);
+watchdog.attach(10, watch);
+}
+
+void loop() {
+#ifdef debug
+       if (!client2.connected()) {
+        client2 = server2.available();
+      }
+#endif
+       bailout:
+       state = 0;
+       memset(rtu_buf, 0, 50);
+       memset(sbuf, 0, 50);
+       if (!client.connected()) {
+        client = server.available();
+        }
+    else{     
+    
+    if (client.available() > 0) {
+      switch (state)
+      {
+       case 10:
+              readnum = 0;
+              readnum = client.read(sbuf,client.available());
+              state = 20;
+              //break;
+              #ifdef debug
+              transaction ++;
+              client2.print("transaction : ");
+              client2.println(transaction);
+              client2.println("case 0");
+              client2.print("readnum :");
+              client2.println(readnum);
+              client2.print("buffer : ");
+              for(int n = 0;readnum > n;n++){
+               client2.print(sbuf[n],HEX);
+              }
+              client2.println("");  
+              #endif        
+       case 20:
+               #ifdef debug       
+               client2.println("case 10");
+               #endif           
+               rtu_len = sbuf[5];
+               for (int i=0 ;i<readnum-6;i++){
+                rtu_buf[i] = sbuf[i+6];
+               }
+               state = 30;
+               //break;
+       case 30:
+               #ifdef debug       
+               client2.println("case 20");
+               #endif           
+               value = calcCRC(rtu_len); 
+               rtu_buf[rtu_len]  = (value & 0xFF00) >> 8;
+               rtu_buf[rtu_len+1] = value & 0x00FF;
+               state = 40;
+               //break;
+       case 40:
+              #ifdef debug         
+              client2.println("case 30");
+              #endif            
+              if (readnum){
+                Serial.flush();
+                digitalWrite(D0,HIGH);
+                Serial.write(rtu_buf,rtu_len + 2);
+                Serial.flush();
+                delay(1);
+                }
+                state = 50;
+                #ifdef debug
+                client2.print("rtu buffer : ");
+                for(int n = 0;(rtu_len + 2) > n;n++){
+                  client2.print(rtu_buf[n],HEX);
+                }
+                client2.println("");
+                #endif            
+                 //break;
+       case 50: // prepare to receive reply from serial
+                 digitalWrite(D0,LOW);
+                 memset(rtu_buf, 0, 50);
+                 state = 60;
+                 //break;
+       case 60:  // wait for char 
+                 currentMillis = millis();
+                 while(!Serial.available()) {
+                 yield();
+                 if( millis() - currentMillis  > interval){
+                  goto bailout;
+                  //state = 0;
+                  } 
+                 }   
+                 state  = 70;
+                 //break;
+       case 70:
+                i = 6;
+                currentMillis = millis();
+                while (Serial.available() > 0) {
+                  rtu_buf[i] = Serial.read();
+                  i ++;
+                  yield();
+                  if( millis() - currentMillis  > interval){
+                  goto bailout;
+                  //state = 0;
+                  } 
+                 }
+         state = 0;
+         break;
+      }
+       
+           rtu_len = i- 2;
+           rtu_buf[5] = rtu_len -6 ;
+           rtu_buf[0] = sbuf[0];
+           rtu_buf[1] = sbuf[1];
+           client.flush();
+           client.write((const uint8_t*)rtu_buf,rtu_len);
+           
+           watchCounter = 0 ;
+           
+           //Unfortunately there is a bad function overload in the library,
+           //but you can just typecast the clientbuf to overcome this problem.....
+           //   eg ... client.write((const uint8_t*)clientBuf, sizeof(clientBuf));
+  }
+ }
+}
